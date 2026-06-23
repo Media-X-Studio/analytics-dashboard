@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindlogicx — Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #080912;
+            --bg-card: #10121e;
+            --bg-card2: #181a2a;
+            --border: #232540;
+            --text: #e2e8f0;
+            --text-muted: #5a6480;
+            --accent: #6366f1;
+            --g: #06d6a0;
+            --o: #f59e0b;
+            --r: #f43f5e;
+            --p: #a855f7;
+            --b: #0ea5e9;
+            --radius: 14px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── HEADER ── */
+        header {
+            background: rgba(16, 18, 30, 0.95);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 62px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-weight: 700;
+            font-size: 15px;
+            white-space: nowrap;
+            text-decoration: none;
+            color: var(--text);
+        }
+
+        .logo-mark {
+            width: 30px; height: 30px;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px;
+        }
+
+        .hdivider { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+
+        /* Mode toggle */
+        .toggle {
+            display: flex;
+            background: var(--bg-card2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 2px;
+        }
+
+        .toggle-btn {
+            background: none; border: none;
+            color: var(--text-muted);
+            padding: 5px 15px;
+            border-radius: 7px;
+            font-size: 12px; font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+            white-space: nowrap;
+        }
+
+        .toggle-btn.active { background: var(--accent); color: #fff; }
+
+        /* Site selects */
+        .sel-wrap { display: flex; align-items: center; gap: 8px; }
+
+        .site-sel {
+            background: var(--bg-card2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 7px 28px 7px 10px;
+            border-radius: 9px;
+            font-size: 12px; font-weight: 500;
+            cursor: pointer; outline: none;
+            font-family: inherit;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235a6480' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            min-width: 185px;
+            transition: border-color .2s;
+        }
+
+        .site-sel:focus { border-color: var(--accent); }
+
+        .vs { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 3px 8px; border-radius: 6px; }
+
+        .spacer { flex: 1; }
+
+        /* Date buttons */
+        .dates {
+            display: flex;
+            background: var(--bg-card2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 3px; gap: 2px;
+        }
+
+        .date-btn {
+            background: none; border: none;
+            color: var(--text-muted);
+            padding: 5px 11px;
+            border-radius: 7px;
+            font-size: 11px; font-weight: 600;
+            cursor: pointer; font-family: inherit;
+            transition: all .2s;
+        }
+
+        .date-btn.active { background: var(--bg-card); color: var(--text); }
+
+        /* Refresh */
+        .refresh-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 13px;
+            border-radius: 9px;
+            font-size: 12px; cursor: pointer;
+            font-family: inherit;
+            transition: all .2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .refresh-btn:hover { border-color: var(--accent); color: var(--text); }
+
+        .refresh-btn svg { transition: transform .6s; }
+        .refresh-btn.spinning svg { animation: spin .7s linear infinite; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── MAIN ── */
+        main {
+            padding: 20px 24px 40px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Site banner */
+        .site-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .site-pill {
+            display: flex; align-items: center; gap: 7px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 14px;
+            font-size: 13px; font-weight: 600;
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        .domain-tag { color: var(--text-muted); font-size: 11px; font-weight: 400; }
+
+        .period-tag {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-left: auto;
+        }
+
+        /* ── KPI GRID ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .kpi {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 16px;
+            transition: border-color .2s, transform .15s;
+            cursor: default;
+        }
+
+        .kpi:hover { border-color: #3a3d5a; transform: translateY(-1px); }
+
+        .kpi-icon { font-size: 18px; margin-bottom: 10px; }
+        .kpi-label { font-size: 10px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
+        .kpi-val { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 5px; }
+        .kpi-sub { font-size: 11px; color: var(--text-muted); }
+        .kpi-sub.good { color: var(--g); }
+        .kpi-sub.bad { color: var(--r); }
+
+        /* ── CHART SECTION ── */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 13px; font-weight: 600;
+            margin-bottom: 16px;
+            display: flex; align-items: center; gap: 7px;
+        }
+
+        .chart-wrap { position: relative; height: 230px; }
+
+        /* ── TABLES ── */
+        .tables-row {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr;
+            gap: 14px;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+        th {
+            text-align: left; color: var(--text-muted);
+            font-weight: 500; padding: 0 0 9px;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+        }
+
+        th:last-child, td:last-child { text-align: right; }
+
+        td {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(35,37,64,.5);
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        .pg { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; }
+
+        .bar-bg {
+            background: var(--bg-card2);
+            border-radius: 3px;
+            height: 5px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--accent);
+        }
+
+        /* ── COMPARE ── */
+        .compare-top { margin-bottom: 16px; }
+
+        .cmp-labels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .cmp-label {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left-width: 3px;
+            border-radius: 10px;
+            font-size: 13px; font-weight: 600;
+        }
+
+        .cmp-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        /* ── LOADING / ERROR ── */
+        .loading {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 340px;
+            color: var(--text-muted);
+            font-size: 13px; gap: 12px;
+        }
+
+        .spinner {
+            width: 22px; height: 22px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+
+        .err {
+            background: rgba(244,63,94,.07);
+            border: 1px solid rgba(244,63,94,.2);
+            color: #f87171;
+            padding: 14px 18px; border-radius: 10px;
+            font-size: 13px; margin: 16px 0;
+        }
+
+        /* Last updated chip */
+        .updated {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 1280px) { .kpi-grid { grid-template-columns: repeat(3,1fr); } }
+        @media (max-width: 1024px) { .tables-row { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 900px) {
+            .charts-row { grid-template-columns: 1fr; }
+            .tables-row { grid-template-columns: 1fr; }
+            .cmp-cols { grid-template-columns: 1fr; }
+            .cmp-labels { grid-template-columns: 1fr; }
+            .kpi-grid { grid-template-columns: repeat(2,1fr); }
+        }
+        @media (max-width: 600px) {
+            header { padding: 0 12px; gap: 8px; }
+            main { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <a class="logo" href="#">
+        <div class="logo-mark">⚡</div>
+        Analytics
+    </a>
+
+    <div class="hdivider"></div>
+
+    <div class="toggle">
+        <button class="toggle-btn active" id="btn-single" onclick="setMode('single')">Single Site</button>
+        <button class="toggle-btn" id="btn-compare" onclick="setMode('compare')">Compare</button>
+    </div>
+
+    <div class="sel-wrap" id="sel-wrap">
+        <select class="site-sel" id="s1" onchange="loadData()"></select>
+        <span class="vs" id="vs-lbl" style="display:none">VS</span>
+        <select class="site-sel" id="s2" style="display:none" onchange="loadData()"></select>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="dates">
+        <button class="date-btn" onclick="setDays(7,this)">7D</button>
+        <button class="date-btn active" onclick="setDays(28,this)">28D</button>
+        <button class="date-btn" onclick="setDays(90,this)">90D</button>
+        <button class="date-btn" onclick="setDays(180,this)">6M</button>
+    </div>
+
+    <button class="refresh-btn" id="refresh-btn" onclick="loadData(true)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+        Refresh
+    </button>
+</header>
+
+<main id="main">
+    <div class="loading"><div class="spinner"></div> Loading analytics…</div>
+</main>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════
+const SITES = [
+    { name: 'Ignitedminds Academy', domain: 'ignitedminds.academy', pid: '516232011', color: '#6366f1' },
+    { name: 'Intelliexams',         domain: 'intelliexams.com',     pid: '533738808', color: '#06d6a0' },
+    { name: 'Mediax Academy',       domain: 'mediax.academy',       pid: '539481048', color: '#f59e0b' },
+    { name: 'Mindlogicx',           domain: 'mindlogicx.com',       pid: '514290667', color: '#f43f5e' },
+    { name: 'The Mediax',           domain: 'themediax.ai',         pid: '514443920', color: '#a855f7' },
+    { name: 'Mindlogicx MY',        domain: 'mindlogicx.com.my',    pid: '514290667', color: '#0ea5e9' },
+];
+
+const CHANNEL_COLORS = ['#6366f1','#06d6a0','#f59e0b','#f43f5e','#a855f7','#0ea5e9','#10b981','#ec4899'];
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let mode = 'single';
+let days = 28;
+let charts = {};
+let lastUpdated = null;
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.addEventListener('load', () => {
+    const s1 = document.getElementById('s1');
+    const s2 = document.getElementById('s2');
+    SITES.forEach((site, i) => {
+        s1.add(new Option(site.name, i));
+        s2.add(new Option(site.name, i));
+    });
+    s2.selectedIndex = 1;
+    loadData();
+});
+
+// ══════════════════════════════════════════
+//  CONTROLS
+// ══════════════════════════════════════════
+function setMode(m) {
+    mode = m;
+    document.getElementById('btn-single').classList.toggle('active', m === 'single');
+    document.getElementById('btn-compare').classList.toggle('active', m === 'compare');
+    document.getElementById('vs-lbl').style.display = m === 'compare' ? '' : 'none';
+    document.getElementById('s2').style.display = m === 'compare' ? '' : 'none';
+    loadData();
+}
+
+function setDays(d, btn) {
+    days = d;
+    document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadData();
+}
+
+function dateRange() {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    const f = d => d.toISOString().slice(0, 10);
+    return { startDate: f(start), endDate: f(end) };
+}
+
+// ══════════════════════════════════════════
+//  API — calls our /api/report proxy
+// ══════════════════════════════════════════
+async function report(pid, body) {
+    const res = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: pid, ...body }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+}
+
+function rows(data) {
+    return (data.rows || []).map(row => ({
+        dims: (row.dimensionValues || []).map(d => d.value),
+        vals: (row.metricValues || []).map(m => m.value),
+    }));
+}
+
+async function fetchSite(site) {
+    const dr = [dateRange()];
+    const pid = site.pid;
+
+    const [overview, trend, pages, channels, countries, sources] = await Promise.all([
+        report(pid, {
+            dateRanges: dr,
+            metrics: [
+                { name: 'totalUsers' }, { name: 'newUsers' }, { name: 'sessions' },
+                { name: 'bounceRate' }, { name: 'averageSessionDuration' }, { name: 'screenPageViews' },
+            ],
+        }),
+        report(pid, {
+            dateRanges: dr,
+            dimensions: [{ name: 'date' }],
+            metrics: [{ name: 'totalUsers' }, { name: 'sessions' }],
+            orderBys: [{ dimension: { dimensionName: 'date' } }],
+        }),
+        report(pid, {
+            dateRanges: dr,
+            dimensions: [{ name: 'pagePath' }],
+            metrics: [{ name: 'screenPageViews' }, { name: 'totalUsers' }],
+            orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+            limit: 10,
+        }),
+        report(pid, {
+            dateRanges: dr,
+            dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+            metrics: [{ name: 'sessions' }],
+            orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+            limit: 8,
+        }),
+        report(pid, {
+            dateRanges: dr,
+            dimensions: [{ name: 'country' }],
+            metrics: [{ name: 'totalUsers' }, { name: 'sessions' }],
+            orderBys: [{ metric: { metricName: 'totalUsers' }, desc: true }],
+            limit: 8,
+        }),
+        report(pid, {
+            dateRanges: dr,
+            dimensions: [{ name: 'sessionSource' }],
+            metrics: [{ name: 'sessions' }],
+            orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+            limit: 8,
+        }),
+    ]);
+
+    return { overview, trend, pages, channels, countries, sources };
+}
+
+// ══════════════════════════════════════════
+//  LOAD
+// ══════════════════════════════════════════
+async function loadData(manual = false) {
+    const main = document.getElementById('main');
+    const btn  = document.getElementById('refresh-btn');
+
+    main.innerHTML = '<div class="loading"><div class="spinner"></div> Loading analytics…</div>';
+    destroyCharts();
+
+    btn.classList.add('spinning');
+
+    const i1 = +document.getElementById('s1').value;
+    const site1 = SITES[i1];
+
+    try {
+        if (mode === 'single') {
+            const d = await fetchSite(site1);
+            renderSingle(site1, d, main);
+        } else {
+            const i2 = +document.getElementById('s2').value;
+            const site2 = SITES[i2];
+            const [d1, d2] = await Promise.all([fetchSite(site1), fetchSite(site2)]);
+            renderCompare(site1, d1, site2, d2, main);
+        }
+        lastUpdated = new Date();
+    } catch (err) {
+        main.innerHTML = `<div class="err">⚠️ ${err.message}</div>`;
+        console.error(err);
+    } finally {
+        btn.classList.remove('spinning');
+    }
+}
+
+// ══════════════════════════════════════════
+//  RENDER — SINGLE SITE
+// ══════════════════════════════════════════
+function renderSingle(site, data, container) {
+    const ov = data.overview.rows?.[0]?.metricValues || [];
+    const K = {
+        users:    +ov[0]?.value || 0,
+        newUsers: +ov[1]?.value || 0,
+        sessions: +ov[2]?.value || 0,
+        bounce:   +ov[3]?.value || 0,
+        dur:      +ov[4]?.value || 0,
+        views:    +ov[5]?.value || 0,
+    };
+
+    const trendR   = rows(data.trend);
+    const pageR    = rows(data.pages);
+    const chanR    = rows(data.channels);
+    const countryR = rows(data.countries);
+    const sourceR  = rows(data.sources);
+    const maxViews = +pageR[0]?.vals[0] || 1;
+    const maxUsers = +countryR[0]?.vals[0] || 1;
+
+    container.innerHTML = `
+        <div class="site-banner">
+            <div class="site-pill">
+                <span class="dot" style="background:${site.color}"></span>
+                ${site.name}
+                <span class="domain-tag">${site.domain}</span>
+            </div>
+            <span class="period-tag">Last ${days} days · Updated ${lastUpdated ? ts(lastUpdated) : 'now'}</span>
+        </div>
+
+        <div class="kpi-grid">
+            ${kpi('👥','Total Users',    fmt(K.users),    `${fmt(K.newUsers)} new`,  'neutral', site.color)}
+            ${kpi('🔄','Sessions',       fmt(K.sessions), `${K.sessions>0?(K.views/K.sessions).toFixed(1):0} pages/session`, 'neutral', '#06d6a0')}
+            ${kpi('📄','Page Views',     fmt(K.views),    `Across all pages`,        'neutral', '#f59e0b')}
+            ${kpi('↩️','Bounce Rate',    pct(K.bounce),   K.bounce>.6?'Needs attention':'Performing well', K.bounce>.6?'bad':'good', '#f43f5e')}
+            ${kpi('⏱️','Avg Duration',   dur(K.dur),      'Per session',             'neutral', '#a855f7')}
+            ${kpi('✨','New Users',      fmt(K.newUsers), pct(K.newUsers/Math.max(K.users,1))+' of total','neutral','#0ea5e9')}
+        </div>
+
+        <div class="charts-row">
+            <div class="card">
+                <div class="card-title">📈 Users &amp; Sessions Over Time</div>
+                <div class="chart-wrap"><canvas id="ch-trend"></canvas></div>
+            </div>
+            <div class="card">
+                <div class="card-title">🎯 Traffic Channels</div>
+                <div class="chart-wrap"><canvas id="ch-chan"></canvas></div>
+            </div>
+        </div>
+
+        <div class="tables-row">
+            <div class="card">
+                <div class="card-title">📄 Top Pages</div>
+                <table>
+                    <thead><tr><th>Page</th><th>Views</th><th>Users</th></tr></thead>
+                    <tbody>${pageR.map(r => `
+                        <tr>
+                            <td>
+                                <div class="pg" title="${r.dims[0]}">${r.dims[0]}</div>
+                                <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(+r.vals[0]/maxViews*100)}%;background:${site.color}"></div></div>
+                            </td>
+                            <td>${fmt(+r.vals[0])}</td>
+                            <td>${fmt(+r.vals[1])}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🌍 Top Countries</div>
+                <table>
+                    <thead><tr><th>Country</th><th>Users</th><th>Sessions</th></tr></thead>
+                    <tbody>${countryR.map(r => `
+                        <tr>
+                            <td>
+                                ${flag(r.dims[0])} ${r.dims[0]}
+                                <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(+r.vals[0]/maxUsers*100)}%;background:#06d6a0"></div></div>
+                            </td>
+                            <td>${fmt(+r.vals[0])}</td>
+                            <td>${fmt(+r.vals[1])}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔗 Traffic Sources</div>
+                <table>
+                    <thead><tr><th>Source</th><th>Sessions</th></tr></thead>
+                    <tbody>${sourceR.map(r => `
+                        <tr>
+                            <td>${r.dims[0] || '(direct)'}</td>
+                            <td>${fmt(+r.vals[0])}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    drawTrend('ch-trend', trendR, site.color, site.name);
+    drawDonut('ch-chan', chanR);
+}
+
+// ══════════════════════════════════════════
+//  RENDER — COMPARE
+// ══════════════════════════════════════════
+function renderCompare(s1, d1, s2, d2, container) {
+    const k1 = kpis(d1), k2 = kpis(d2);
+    const tr1 = rows(d1.trend), tr2 = rows(d2.trend);
+    const p1 = rows(d1.pages), p2 = rows(d2.pages);
+    const c1 = rows(d1.countries), c2 = rows(d2.countries);
+
+    container.innerHTML = `
+        <div class="compare-top">
+            <div class="card" style="margin-bottom:14px;">
+                <div class="card-title">📊 Metrics Comparison — Last ${days} days</div>
+                <div class="chart-wrap" style="height:200px;"><canvas id="ch-cmp"></canvas></div>
+            </div>
+
+            <div class="cmp-labels">
+                <div class="cmp-label" style="border-left-color:${s1.color}">
+                    <span class="dot" style="background:${s1.color}"></span>
+                    ${s1.name} <span class="domain-tag">${s1.domain}</span>
+                </div>
+                <div class="cmp-label" style="border-left-color:${s2.color}">
+                    <span class="dot" style="background:${s2.color}"></span>
+                    ${s2.name} <span class="domain-tag">${s2.domain}</span>
+                </div>
+            </div>
+
+            <!-- KPIs side by side -->
+            <div class="cmp-cols" style="margin-bottom:14px;">
+                <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+                    ${kpi('👥','Users',     fmt(k1.users),    '',       'neutral', s1.color)}
+                    ${kpi('🔄','Sessions',  fmt(k1.sessions), '',       'neutral', '#06d6a0')}
+                    ${kpi('📄','Page Views',fmt(k1.views),    '',       'neutral', '#f59e0b')}
+                    ${kpi('↩️','Bounce',    pct(k1.bounce),   '',       k1.bounce>.6?'bad':'good', '#f43f5e')}
+                    ${kpi('⏱️','Avg Dur',   dur(k1.dur),      '',       'neutral', '#a855f7')}
+                    ${kpi('✨','New Users', fmt(k1.newUsers), '',       'neutral', '#0ea5e9')}
+                </div>
+                <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+                    ${kpi('👥','Users',     fmt(k2.users),    '',       'neutral', s2.color)}
+                    ${kpi('🔄','Sessions',  fmt(k2.sessions), '',       'neutral', '#06d6a0')}
+                    ${kpi('📄','Page Views',fmt(k2.views),    '',       'neutral', '#f59e0b')}
+                    ${kpi('↩️','Bounce',    pct(k2.bounce),   '',       k2.bounce>.6?'bad':'good', '#f43f5e')}
+                    ${kpi('⏱️','Avg Dur',   dur(k2.dur),      '',       'neutral', '#a855f7')}
+                    ${kpi('✨','New Users', fmt(k2.newUsers), '',       'neutral', '#0ea5e9')}
+                </div>
+            </div>
+
+            <!-- Trend charts -->
+            <div class="cmp-cols" style="margin-bottom:14px;">
+                <div class="card">
+                    <div class="card-title" style="color:${s1.color}">📈 ${s1.name} — Traffic</div>
+                    <div class="chart-wrap"><canvas id="ch-tr1"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title" style="color:${s2.color}">📈 ${s2.name} — Traffic</div>
+                    <div class="chart-wrap"><canvas id="ch-tr2"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Pages + Countries -->
+            <div class="cmp-cols">
+                <div>
+                    <div class="card" style="margin-bottom:14px;">
+                        <div class="card-title">📄 Top Pages — ${s1.name}</div>
+                        ${pageTable(p1, s1.color)}
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🌍 Top Countries — ${s1.name}</div>
+                        ${countryTable(c1)}
+                    </div>
+                </div>
+                <div>
+                    <div class="card" style="margin-bottom:14px;">
+                        <div class="card-title">📄 Top Pages — ${s2.name}</div>
+                        ${pageTable(p2, s2.color)}
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🌍 Top Countries — ${s2.name}</div>
+                        ${countryTable(c2)}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    drawCompareBar('ch-cmp', s1, k1, s2, k2);
+    drawTrend('ch-tr1', tr1, s1.color, s1.name);
+    drawTrend('ch-tr2', tr2, s2.color, s2.name);
+}
+
+// ══════════════════════════════════════════
+//  CHART HELPERS
+// ══════════════════════════════════════════
+const BASE = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#5a6480', font: { size: 11 }, boxWidth: 10 } } }
+};
+const SCALE = {
+    grid: { color: '#1e2038' },
+    ticks: { color: '#3d4466', font: { size: 10 } }
+};
+
+function drawTrend(id, trendR, color, label) {
+    const ctx = document.getElementById(id)?.getContext('2d');
+    if (!ctx) return;
+    const labels = trendR.map(r => { const d = r.dims[0]; return `${d.slice(4,6)}/${d.slice(6,8)}`; });
+    charts[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Users',    data: trendR.map(r => +r.vals[0]), borderColor: color, backgroundColor: color+'18', fill: true,  tension: .4, pointRadius: 1.5, borderWidth: 2 },
+                { label: 'Sessions', data: trendR.map(r => +r.vals[1]), borderColor: color+'60', borderDash: [5,3],      fill: false, tension: .4, pointRadius: 1.5, borderWidth: 1.5 }
+            ]
+        },
+        options: { ...BASE, scales: { x: { ...SCALE, ticks: { ...SCALE.ticks, maxTicksLimit: 7 } }, y: { ...SCALE, beginAtZero: true } } }
+    });
+}
+
+function drawDonut(id, chanR) {
+    const ctx = document.getElementById(id)?.getContext('2d');
+    if (!ctx) return;
+    charts[id] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: chanR.map(r => r.dims[0] || 'Unknown'),
+            datasets: [{ data: chanR.map(r => +r.vals[0]), backgroundColor: CHANNEL_COLORS, borderColor: '#10121e', borderWidth: 2 }]
+        },
+        options: {
+            ...BASE, cutout: '62%',
+            plugins: { legend: { position: 'bottom', labels: { color: '#5a6480', font: { size: 11 }, boxWidth: 10, padding: 10 } } }
+        }
+    });
+}
+
+function drawCompareBar(id, s1, k1, s2, k2) {
+    const ctx = document.getElementById(id)?.getContext('2d');
+    if (!ctx) return;
+    charts[id] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Users', 'Sessions', 'Page Views', 'New Users'],
+            datasets: [
+                { label: s1.name, data: [k1.users, k1.sessions, k1.views, k1.newUsers], backgroundColor: s1.color+'bb', borderColor: s1.color, borderWidth: 1, borderRadius: 6 },
+                { label: s2.name, data: [k2.users, k2.sessions, k2.views, k2.newUsers], backgroundColor: s2.color+'bb', borderColor: s2.color, borderWidth: 1, borderRadius: 6 }
+            ]
+        },
+        options: { ...BASE, scales: { x: SCALE, y: { ...SCALE, beginAtZero: true } } }
+    });
+}
+
+// ══════════════════════════════════════════
+//  HTML HELPERS
+// ══════════════════════════════════════════
+function kpi(icon, label, val, sub, cls, color) {
+    return `<div class="kpi">
+        <div class="kpi-icon">${icon}</div>
+        <div class="kpi-label">${label}</div>
+        <div class="kpi-val" style="color:${color}">${val}</div>
+        ${sub ? `<div class="kpi-sub ${cls}">${sub}</div>` : ''}
+    </div>`;
+}
+
+function kpis(data) {
+    const ov = data.overview.rows?.[0]?.metricValues || [];
+    return {
+        users:    +ov[0]?.value || 0,
+        newUsers: +ov[1]?.value || 0,
+        sessions: +ov[2]?.value || 0,
+        bounce:   +ov[3]?.value || 0,
+        dur:      +ov[4]?.value || 0,
+        views:    +ov[5]?.value || 0,
+    };
+}
+
+function pageTable(rs, color) {
+    const max = +rs[0]?.vals[0] || 1;
+    return `<table>
+        <thead><tr><th>Page</th><th>Views</th></tr></thead>
+        <tbody>${rs.slice(0,7).map(r => `
+            <tr>
+                <td>
+                    <div class="pg" title="${r.dims[0]}">${r.dims[0]}</div>
+                    <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(+r.vals[0]/max*100)}%;background:${color}"></div></div>
+                </td>
+                <td>${fmt(+r.vals[0])}</td>
+            </tr>`).join('')}
+        </tbody>
+    </table>`;
+}
+
+function countryTable(rs) {
+    return `<table>
+        <thead><tr><th>Country</th><th>Users</th></tr></thead>
+        <tbody>${rs.slice(0,5).map(r => `
+            <tr><td>${flag(r.dims[0])} ${r.dims[0]}</td><td>${fmt(+r.vals[0])}</td></tr>`).join('')}
+        </tbody>
+    </table>`;
+}
+
+// ══════════════════════════════════════════
+//  FORMATTERS
+// ══════════════════════════════════════════
+function fmt(n) {
+    if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+    return n.toLocaleString();
+}
+
+function pct(r) { return (r*100).toFixed(1)+'%'; }
+
+function dur(s) {
+    const m = Math.floor(s/60), sec = Math.floor(s%60);
+    return `${m}m ${sec.toString().padStart(2,'0')}s`;
+}
+
+function ts(d) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function flag(c) {
+    const m = {India:'🇮🇳','United States':'🇺🇸','United Kingdom':'🇬🇧',Australia:'🇦🇺',Canada:'🇨🇦',Malaysia:'🇲🇾',Singapore:'🇸🇬',Germany:'🇩🇪',France:'🇫🇷',Japan:'🇯🇵',China:'🇨🇳',Brazil:'🇧🇷',Indonesia:'🇮🇩','United Arab Emirates':'🇦🇪',Philippines:'🇵🇭',Thailand:'🇹🇭'};
+    return m[c] || '🌐';
+}
+
+function destroyCharts() {
+    Object.values(charts).forEach(c => c?.destroy?.());
+    charts = {};
+}
+</script>
+</body>
+</html>
