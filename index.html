@@ -167,18 +167,54 @@
 
         /* Theme toggle */
         .theme-btn {
-            background: none;
+            background: var(--bg-card2);
             border: 1px solid var(--border);
             color: var(--text-muted);
             width: 34px; height: 34px;
             border-radius: 9px;
             cursor: pointer;
-            font-size: 16px;
             display: flex; align-items: center; justify-content: center;
             transition: all .2s;
             flex-shrink: 0;
+            padding: 0;
         }
-        .theme-btn:hover { border-color: var(--accent); color: var(--text); }
+        .theme-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-card); }
+        .theme-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* Custom date range */
+        .date-custom-wrap { position: relative; }
+        .date-custom-btn { padding: 5px 11px; }
+        .date-picker-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            z-index: 200;
+            min-width: 240px;
+            box-shadow: 0 8px 32px rgba(0,0,0,.35);
+            gap: 10px;
+            flex-direction: column;
+        }
+        .date-picker-dropdown.open { display: flex; }
+        .date-picker-dropdown label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 3px; display: block; }
+        .date-picker-dropdown input[type=date] {
+            width: 100%; background: var(--bg-card2); border: 1px solid var(--border);
+            color: var(--text); border-radius: 8px; padding: 6px 9px; font-size: 12px;
+            font-family: inherit; outline: none; cursor: pointer;
+            color-scheme: dark;
+        }
+        body.light .date-picker-dropdown input[type=date] { color-scheme: light; }
+        .date-picker-dropdown input[type=date]:focus { border-color: var(--accent); }
+        .dp-apply {
+            margin-top: 4px; background: var(--accent); color: #fff; border: none;
+            border-radius: 8px; padding: 7px; font-size: 12px; font-weight: 600;
+            cursor: pointer; font-family: inherit; width: 100%; transition: opacity .2s;
+        }
+        .dp-apply:hover { opacity: .88; }
 
         .refresh-btn svg { transition: transform .6s; }
         .refresh-btn.spinning svg { animation: spin .7s linear infinite; }
@@ -429,9 +465,26 @@
         <button class="date-btn active" onclick="setDays(28,this)">28D</button>
         <button class="date-btn" onclick="setDays(90,this)">90D</button>
         <button class="date-btn" onclick="setDays(180,this)">6M</button>
+        <div class="date-custom-wrap">
+            <button class="date-btn date-custom-btn" id="btn-custom" onclick="toggleDatePicker(event)">Custom</button>
+            <div class="date-picker-dropdown" id="date-picker">
+                <div>
+                    <label>From</label>
+                    <input type="date" id="dp-start"/>
+                </div>
+                <div>
+                    <label>To</label>
+                    <input type="date" id="dp-end"/>
+                </div>
+                <button class="dp-apply" onclick="applyCustomRange()">Apply</button>
+            </div>
+        </div>
     </div>
 
-    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark theme">🌙</button>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark">
+        <svg id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <svg id="icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
 
     <button class="refresh-btn" id="refresh-btn" onclick="loadData(true)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -497,12 +550,12 @@ let leafletMaps = {};
 // ══════════════════════════════════════════
 let mode = 'single';
 let days = 28;
+let customStart = null, customEnd = null;
 
 function toggleTheme() {
     const isLight = document.body.classList.toggle('light');
-    document.getElementById('theme-btn').textContent = isLight ? '🌑' : '🌙';
-    // Leaflet tiles swap automatically since we just rebuild the map on next load
-    // Persist preference
+    document.getElementById('icon-moon').style.display = isLight ? 'none' : '';
+    document.getElementById('icon-sun').style.display  = isLight ? '' : 'none';
     try { localStorage.setItem('theme', isLight ? 'light' : 'dark'); } catch(e) {}
 }
 
@@ -512,12 +565,42 @@ function toggleTheme() {
         if (localStorage.getItem('theme') === 'light') {
             document.body.classList.add('light');
             document.addEventListener('DOMContentLoaded', () => {
-                const btn = document.getElementById('theme-btn');
-                if (btn) btn.textContent = '🌑';
+                const moon = document.getElementById('icon-moon');
+                const sun  = document.getElementById('icon-sun');
+                if (moon) moon.style.display = 'none';
+                if (sun)  sun.style.display  = '';
             });
         }
     } catch(e) {}
 })();
+
+function toggleDatePicker(e) {
+    e.stopPropagation();
+    const dp = document.getElementById('date-picker');
+    dp.classList.toggle('open');
+    // Set default dates if empty
+    const today = new Date().toISOString().slice(0,10);
+    const ago28 = new Date(Date.now() - 28*864e5).toISOString().slice(0,10);
+    if (!document.getElementById('dp-start').value) document.getElementById('dp-start').value = ago28;
+    if (!document.getElementById('dp-end').value)   document.getElementById('dp-end').value   = today;
+}
+
+function applyCustomRange() {
+    const s = document.getElementById('dp-start').value;
+    const e = document.getElementById('dp-end').value;
+    if (!s || !e || s > e) { alert('Please select a valid date range.'); return; }
+    customStart = s; customEnd = e;
+    document.getElementById('date-picker').classList.remove('open');
+    // Mark Custom button as active
+    document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-custom').classList.add('active');
+    loadData();
+}
+
+// Close picker when clicking outside
+document.addEventListener('click', () => {
+    document.getElementById('date-picker')?.classList.remove('open');
+});
 let charts = {};
 let lastUpdated = null;
 
@@ -549,12 +632,14 @@ function setMode(m) {
 
 function setDays(d, btn) {
     days = d;
+    customStart = null; customEnd = null;
     document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     loadData();
 }
 
 function dateRange() {
+    if (customStart && customEnd) return { startDate: customStart, endDate: customEnd };
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - days);
