@@ -27,6 +27,15 @@
             --radius: 14px;
         }
 
+        body.light {
+            --bg: #f0f2f8;
+            --bg-card: #ffffff;
+            --bg-card2: #e8eaf2;
+            --border: #d1d5e8;
+            --text: #1a1d2e;
+            --text-muted: #7b82a0;
+        }
+
         body {
             font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg);
@@ -36,7 +45,7 @@
 
         /* ── HEADER ── */
         header {
-            background: rgba(16, 18, 30, 0.95);
+            background: var(--bg-card);
             backdrop-filter: blur(14px);
             border-bottom: 1px solid var(--border);
             padding: 0 24px;
@@ -155,6 +164,21 @@
         }
 
         .refresh-btn:hover { border-color: var(--accent); color: var(--text); }
+
+        /* Theme toggle */
+        .theme-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 34px; height: 34px;
+            border-radius: 9px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .2s;
+            flex-shrink: 0;
+        }
+        .theme-btn:hover { border-color: var(--accent); color: var(--text); }
 
         .refresh-btn svg { transition: transform .6s; }
         .refresh-btn.spinning svg { animation: spin .7s linear infinite; }
@@ -344,11 +368,11 @@
 
         /* ── WORLD MAP ── */
         .map-wrap { position: relative; height: 360px; border-radius: 10px; overflow: hidden; }
-        .leaflet-container { background: #10121e !important; }
-        .leaflet-control-zoom a { background: #181a2a; border-color: #232540; color: #e2e8f0; }
-        .leaflet-control-zoom a:hover { background: #232540; }
-        .leaflet-popup-content-wrapper { background: #181a2a; border: 1px solid #232540; color: #e2e8f0; border-radius: 10px; }
-        .leaflet-popup-tip { background: #181a2a; }
+        .leaflet-container { background: var(--bg-card) !important; }
+        .leaflet-control-zoom a { background: var(--bg-card2); border-color: var(--border); color: var(--text); }
+        .leaflet-control-zoom a:hover { background: var(--border); }
+        .leaflet-popup-content-wrapper { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text); border-radius: 10px; }
+        .leaflet-popup-tip { background: var(--bg-card2); }
 
         .map-row {
             margin-bottom: 14px;
@@ -406,6 +430,8 @@
         <button class="date-btn" onclick="setDays(90,this)">90D</button>
         <button class="date-btn" onclick="setDays(180,this)">6M</button>
     </div>
+
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark theme">🌙</button>
 
     <button class="refresh-btn" id="refresh-btn" onclick="loadData(true)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -471,6 +497,27 @@ let leafletMaps = {};
 // ══════════════════════════════════════════
 let mode = 'single';
 let days = 28;
+
+function toggleTheme() {
+    const isLight = document.body.classList.toggle('light');
+    document.getElementById('theme-btn').textContent = isLight ? '🌑' : '🌙';
+    // Leaflet tiles swap automatically since we just rebuild the map on next load
+    // Persist preference
+    try { localStorage.setItem('theme', isLight ? 'light' : 'dark'); } catch(e) {}
+}
+
+// Apply saved theme on load
+(function() {
+    try {
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light');
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('theme-btn');
+                if (btn) btn.textContent = '🌑';
+            });
+        }
+    } catch(e) {}
+})();
 let charts = {};
 let lastUpdated = null;
 
@@ -909,7 +956,11 @@ function drawWorldMap(id, countryRows, color = '#6366f1') {
     });
 
     // Dark tile layer (CartoDB Dark Matter)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    const isLight = document.body.classList.contains('light');
+    const tileUrl = isLight
+        ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    L.tileLayer(tileUrl, {
         subdomains: 'abcd',
         maxZoom: 20,
     }).addTo(map);
