@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mindlogicx — Analytics Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4/build/index.umd.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -343,7 +343,12 @@
         }
 
         /* ── WORLD MAP ── */
-        .map-wrap { position: relative; height: 320px; }
+        .map-wrap { position: relative; height: 360px; border-radius: 10px; overflow: hidden; }
+        .leaflet-container { background: #10121e !important; }
+        .leaflet-control-zoom a { background: #181a2a; border-color: #232540; color: #e2e8f0; }
+        .leaflet-control-zoom a:hover { background: #232540; }
+        .leaflet-popup-content-wrapper { background: #181a2a; border: 1px solid #232540; color: #e2e8f0; border-radius: 10px; }
+        .leaflet-popup-tip { background: #181a2a; }
 
         .map-row {
             margin-bottom: 14px;
@@ -459,13 +464,7 @@ const COUNTRY_LATLON = {
     'Serbia':[44.02,21.01],'Chile':[-35.68,-71.54],'Venezuela':[6.42,-66.59],
 };
 
-let worldAtlas = null;
-async function getWorldAtlas() {
-    if (worldAtlas) return worldAtlas;
-    const data = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json());
-    worldAtlas = data;
-    return worldAtlas;
-}
+let leafletMaps = {};
 
 // ══════════════════════════════════════════
 //  STATE
@@ -677,7 +676,7 @@ function renderSingle(site, data, container) {
         <div class="map-row">
             <div class="card">
                 <div class="card-title">🌍 Geographic Distribution</div>
-                <div class="map-wrap"><canvas id="ch-map"></canvas></div>
+                <div class="map-wrap" id="ch-map"></div>
             </div>
         </div>
 
@@ -872,53 +871,65 @@ function drawDonut(id, chanR) {
     });
 }
 
-async function drawWorldMap(id, countryRows, color = '#6366f1') {
-    const ctx = document.getElementById(id)?.getContext('2d');
-    if (!ctx) return;
-    try {
-        const world = await getWorldAtlas();
-        const countries = ChartGeo.topojson.feature(world, world.objects.countries);
+function drawWorldMap(id, countryRows, color = '#6366f1') {
+    const el = document.getElementById(id);
+    if (!el) return;
 
-        const bubbles = countryRows
-            .filter(r => COUNTRY_LATLON[r.dims[0]])
-            .map(r => {
-                const [lat, lon] = COUNTRY_LATLON[r.dims[0]];
-                const users = +r.vals[0];
-                return { latitude: lat, longitude: lon, r: Math.max(3, Math.sqrt(users) * 1.8), label: r.dims[0], users };
-            });
-
-        charts[id] = new Chart(ctx, {
-            type: 'bubbleMap',
-            data: {
-                labels: bubbles.map(b => b.label),
-                datasets: [{
-                    label: 'Users',
-                    outline: countries,
-                    backgroundColor: color + '99',
-                    borderColor: color,
-                    borderWidth: 1,
-                    data: bubbles,
-                }]
-            },
-            options: {
-                showOutline: true,
-                showGraticule: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => `${ctx.label}: ${ctx.raw.users?.toLocaleString()} users`
-                        }
-                    }
-                },
-                scales: {
-                    projection: { axis: 'x', projection: 'equalEarth' }
-                }
-            }
-        });
-    } catch(e) {
-        console.warn('World map error:', e);
+    // Destroy existing map instance
+    if (leafletMaps[id]) {
+        leafletMaps[id].remove();
+        delete leafletMaps[id];
     }
+
+    // Filter rows with known coords
+    const bubbles = countryRows
+        .filter(r => COUNTRY_LATLON[r.dims[0]])
+        .map(r => {
+            const [lat, lon] = COUNTRY_LATLON[r.dims[0]];
+            const users = +r.vals[0];
+            return { lat, lon, country: r.dims[0], users };
+        });
+
+    if (bubbles.length === 0) {
+        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#5a6480;font-size:13px;">No geographic data available</div>';
+        return;
+    }
+
+    const maxUsers = Math.max(...bubbles.map(b => b.users));
+
+    // Init Leaflet map
+    const map = L.map(id, {
+        center: [20, 10],
+        zoom: 2,
+        minZoom: 1,
+        maxZoom: 6,
+        zoomControl: true,
+        attributionControl: false,
+        scrollWheelZoom: false,
+    });
+
+    // Dark tile layer (CartoDB Dark Matter)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+    }).addTo(map);
+
+    // Add bubble circles
+    bubbles.forEach(b => {
+        const radius = Math.max(8, Math.sqrt(b.users / maxUsers) * 45);
+        const circle = L.circleMarker([b.lat, b.lon], {
+            radius,
+            fillColor: color,
+            color: color,
+            weight: 1.5,
+            opacity: 0.9,
+            fillOpacity: 0.35,
+        });
+        circle.bindPopup(`<b style="color:${color}">${b.country}</b><br/>${b.users.toLocaleString()} users`, { maxWidth: 150 });
+        circle.addTo(map);
+    });
+
+    leafletMaps[id] = map;
 }
 
 function drawCompareBar(id, s1, k1, s2, k2) {
@@ -1014,6 +1025,8 @@ function flag(c) {
 function destroyCharts() {
     Object.values(charts).forEach(c => c?.destroy?.());
     charts = {};
+    Object.values(leafletMaps).forEach(m => m?.remove?.());
+    leafletMaps = {};
 }
 </script>
 </body>
