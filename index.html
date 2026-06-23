@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mindlogicx — Analytics Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4/build/index.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -340,6 +342,20 @@
             font-size: 11px;
         }
 
+        /* ── WORLD MAP ── */
+        .map-wrap { position: relative; height: 320px; }
+
+        .map-row {
+            margin-bottom: 14px;
+        }
+
+        .country-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: var(--bg-card2); border: 1px solid var(--border);
+            border-radius: 6px; padding: 3px 8px;
+            font-size: 11px; margin: 2px;
+        }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 1280px) { .kpi-grid { grid-template-columns: repeat(3,1fr); } }
         @media (max-width: 1024px) { .tables-row { grid-template-columns: 1fr 1fr; } }
@@ -413,6 +429,43 @@ const SITES = [
 ];
 
 const CHANNEL_COLORS = ['#6366f1','#06d6a0','#f59e0b','#f43f5e','#a855f7','#0ea5e9','#10b981','#ec4899'];
+
+const COUNTRY_LATLON = {
+    'India':[20.59,78.96],'United States':[37.09,-95.71],'United Kingdom':[55.38,-3.44],
+    'Australia':[-25.27,133.78],'Canada':[56.13,-106.35],'Malaysia':[4.21,101.98],
+    'Singapore':[1.35,103.82],'Germany':[51.17,10.45],'France':[46.23,2.21],
+    'Japan':[36.20,138.25],'China':[35.86,104.19],'Brazil':[-14.24,-51.93],
+    'Indonesia':[-0.79,113.92],'United Arab Emirates':[23.42,53.85],'Philippines':[12.88,121.77],
+    'Thailand':[15.87,100.99],'Pakistan':[30.38,69.35],'Bangladesh':[23.68,90.36],
+    'Sri Lanka':[7.87,80.77],'Nepal':[28.39,84.12],'South Africa':[-30.56,22.94],
+    'Nigeria':[9.08,8.68],'Kenya':[-0.02,37.91],'Egypt':[26.82,30.80],
+    'Saudi Arabia':[23.89,45.08],'Qatar':[25.35,51.18],'Kuwait':[29.31,47.48],
+    'New Zealand':[-40.90,174.89],'South Korea':[35.91,127.77],'Vietnam':[14.06,108.28],
+    'Netherlands':[52.13,5.29],'Spain':[40.46,-3.75],'Italy':[41.87,12.57],
+    'Sweden':[60.13,18.64],'Norway':[60.47,8.47],'Denmark':[56.26,9.50],
+    'Poland':[51.92,19.15],'Russia':[61.52,105.32],'Turkey':[38.96,35.24],
+    'Mexico':[23.63,-102.55],'Argentina':[-38.42,-63.62],'Colombia':[4.57,-74.30],
+    'Peru':[-9.19,-75.02],'Ghana':[7.95,-1.02],'Ethiopia':[9.15,40.49],
+    'Tanzania':[-6.37,34.89],'Uganda':[1.37,32.29],'Morocco':[31.79,-7.09],
+    'Israel':[31.05,34.85],'Jordan':[30.59,36.24],'Lebanon':[33.85,35.86],
+    'Hong Kong':[22.40,114.11],'Taiwan':[23.70,121.00],'Maldives':[3.20,73.22],
+    'Portugal':[39.40,-8.22],'Switzerland':[46.82,8.23],'Austria':[47.52,14.55],
+    'Belgium':[50.50,4.47],'Greece':[39.07,21.82],'Ukraine':[48.38,31.17],
+    'Romania':[45.94,24.97],'Czech Republic':[49.82,15.47],'Hungary':[47.16,19.50],
+    'Myanmar':[21.92,95.96],'Cambodia':[12.57,104.99],'Bahrain':[26.07,50.55],
+    'Oman':[21.51,55.92],'Mauritius':[-20.35,57.55],'Afghanistan':[33.94,67.71],
+    'Algeria':[28.03,1.66],'Tunisia':[33.89,9.54],'Libya':[26.34,17.23],
+    'Ireland':[53.41,-8.24],'Finland':[61.92,25.75],'Croatia':[45.10,15.20],
+    'Serbia':[44.02,21.01],'Chile':[-35.68,-71.54],'Venezuela':[6.42,-66.59],
+};
+
+let worldAtlas = null;
+async function getWorldAtlas() {
+    if (worldAtlas) return worldAtlas;
+    const data = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json());
+    worldAtlas = data;
+    return worldAtlas;
+}
 
 // ══════════════════════════════════════════
 //  STATE
@@ -621,6 +674,13 @@ function renderSingle(site, data, container) {
             </div>
         </div>
 
+        <div class="map-row">
+            <div class="card">
+                <div class="card-title">🌍 Geographic Distribution</div>
+                <div class="map-wrap"><canvas id="ch-map"></canvas></div>
+            </div>
+        </div>
+
         <div class="tables-row">
             <div class="card">
                 <div class="card-title">📄 Top Pages</div>
@@ -673,6 +733,7 @@ function renderSingle(site, data, container) {
 
     drawTrend('ch-trend', trendR, site.color, site.name);
     drawDonut('ch-chan', chanR);
+    drawWorldMap('ch-map', countryR, site.color);
 }
 
 // ══════════════════════════════════════════
@@ -809,6 +870,55 @@ function drawDonut(id, chanR) {
             plugins: { legend: { position: 'bottom', labels: { color: '#5a6480', font: { size: 11 }, boxWidth: 10, padding: 10 } } }
         }
     });
+}
+
+async function drawWorldMap(id, countryRows, color = '#6366f1') {
+    const ctx = document.getElementById(id)?.getContext('2d');
+    if (!ctx) return;
+    try {
+        const world = await getWorldAtlas();
+        const countries = ChartGeo.topojson.feature(world, world.objects.countries);
+
+        const bubbles = countryRows
+            .filter(r => COUNTRY_LATLON[r.dims[0]])
+            .map(r => {
+                const [lat, lon] = COUNTRY_LATLON[r.dims[0]];
+                const users = +r.vals[0];
+                return { latitude: lat, longitude: lon, r: Math.max(3, Math.sqrt(users) * 1.8), label: r.dims[0], users };
+            });
+
+        charts[id] = new Chart(ctx, {
+            type: 'bubbleMap',
+            data: {
+                labels: bubbles.map(b => b.label),
+                datasets: [{
+                    label: 'Users',
+                    outline: countries,
+                    backgroundColor: color + '99',
+                    borderColor: color,
+                    borderWidth: 1,
+                    data: bubbles,
+                }]
+            },
+            options: {
+                showOutline: true,
+                showGraticule: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.label}: ${ctx.raw.users?.toLocaleString()} users`
+                        }
+                    }
+                },
+                scales: {
+                    projection: { axis: 'x', projection: 'equalEarth' }
+                }
+            }
+        });
+    } catch(e) {
+        console.warn('World map error:', e);
+    }
 }
 
 function drawCompareBar(id, s1, k1, s2, k2) {
