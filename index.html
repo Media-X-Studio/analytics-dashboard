@@ -247,6 +247,15 @@
         .kpi-label { font-size: 10.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
         .kpi-spark { margin-top: 11px; height: 30px; width: 100%; display: block; }
         .kpi-sub { font-size: 11px; color: var(--text-dim); margin-top: 9px; }
+        .kpi-tr { display: flex; align-items: center; gap: 7px; }
+        .info { display: inline-flex; align-items: center; justify-content: center; cursor: help; color: var(--text-dim); transition: color .15s; flex-shrink: 0; }
+        .info:hover { color: var(--accent); }
+        .info svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .card-title .info { margin-left: 2px; }
+        #tip { position: fixed; z-index: 9999; max-width: 264px; background: var(--card-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: 11px; padding: 10px 13px; font-size: 12px; line-height: 1.55; box-shadow: 0 14px 38px rgba(0,0,0,.45); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s; }
+        body.light #tip { box-shadow: 0 14px 38px rgba(15,23,42,.22); }
+        #tip.show { opacity: 1; transform: translateY(0); }
+        #tip .tip-title { display: block; font-weight: 700; margin-bottom: 3px; color: var(--text); }
 
         .delta {
             display: inline-flex; align-items: center; gap: 3px;
@@ -478,6 +487,64 @@ const ICONS = {
     down:'<path d="M6 9l6 6 6-6"/>',
 };
 function ic(n){ return `<svg viewBox="0 0 24 24">${ICONS[n]||''}</svg>`; }
+
+const INFO_SVG = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+const TIPS = {
+  users:    { t:'Total Users',  d:'Unique visitors to the site in this period. Each person is counted once, even with multiple visits. The badge shows the change vs the previous period.' },
+  sessions: { t:'Sessions',     d:'A session is a single visit. One user can have several. A session ends after about 30 minutes of inactivity. The badge compares with the previous period.' },
+  views:    { t:'Page Views',   d:'Total pages viewed, including repeat views of the same page. The badge compares with the previous period.' },
+  bounce:   { t:'Bounce Rate',  d:'Share of visits where the person left without interacting (no clicks, scroll, or second page). Lower is usually better, so a red up-arrow means it rose.' },
+  duration: { t:'Avg Duration', d:'Average time a visitor spends per session. The badge compares with the previous period.' },
+  newusers: { t:'New Users',    d:'Visitors arriving for the first time in this period. The badge compares with the previous period.' },
+};
+function infoFor(key){ const t=TIPS[key]; return t?`<span class="info" data-tip-title="${t.t}" data-tip="${t.d}">${INFO_SVG}</span>`:''; }
+
+const CARD_TIPS = [
+  ['Users & Sessions', 'Users & Sessions Over Time', 'Daily trend over the selected period. The solid line is users; the dashed line is sessions.'],
+  ['Traffic Channels', 'Traffic Channels', 'How visitors arrived, grouped into channels such as Organic Search, Direct, Referral, Social and Email.'],
+  ['Geographic', 'Geographic Distribution', 'Where your visitors are located. Each bubble is a country; bigger bubbles mean more users.'],
+  ['Top Pages', 'Top Pages', 'The most-viewed pages with view and user counts. Type in the box to filter, or click a column header to sort.'],
+  ['Top Countries', 'Top Countries', 'Countries sending the most users, with their session counts.'],
+  ['Traffic Sources', 'Traffic Sources', 'The specific sources or referrers sending visits (for example google, direct, or facebook.com).'],
+  ['Metrics Comparison', 'Metrics Comparison', 'Key totals for the two selected sites shown side by side for the chosen period.'],
+  ['\u2014 Traffic', 'Traffic Trend', 'Daily users (solid line) and sessions (dashed line) for this site over the selected period.'],
+];
+function attachCardTips(){
+  document.querySelectorAll('.card-title').forEach(el=>{
+    if (el.querySelector('.info')) return;
+    const txt = el.textContent || '';
+    const hit = CARD_TIPS.find(c => txt.indexOf(c[0]) !== -1);
+    if (!hit) return;
+    const s = document.createElement('span');
+    s.className = 'info';
+    s.setAttribute('data-tip-title', hit[1]);
+    s.setAttribute('data-tip', hit[2]);
+    s.innerHTML = INFO_SVG;
+    el.appendChild(s);
+  });
+}
+(function initTips(){
+  const TIP = document.createElement('div'); TIP.id = 'tip'; document.body.appendChild(TIP);
+  function show(el){
+    const d = el.getAttribute('data-tip'); if(!d) return;
+    const t = el.getAttribute('data-tip-title') || '';
+    TIP.innerHTML = (t?`<span class="tip-title">${t}</span>`:'') + d;
+    TIP.classList.add('show');
+    const r = el.getBoundingClientRect();
+    const tw = TIP.offsetWidth, th = TIP.offsetHeight;
+    let left = r.left + r.width/2 - tw/2;
+    let top = r.bottom + 9;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    if (top + th > window.innerHeight - 8) top = r.top - th - 9;
+    TIP.style.left = left+'px'; TIP.style.top = top+'px';
+  }
+  function hide(){ TIP.classList.remove('show'); }
+  document.addEventListener('mouseover', e=>{ const el=e.target.closest && e.target.closest('.info'); if(el) show(el); });
+  document.addEventListener('mouseout',  e=>{ const el=e.target.closest && e.target.closest('.info'); if(el) hide(); });
+  document.addEventListener('click', e=>{ const el=e.target.closest && e.target.closest('.info'); if(el){ e.stopPropagation(); TIP.classList.contains('show')?hide():show(el); } else { hide(); } });
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+})();
 
 let leafletMaps = {};
 let mode = 'single';
@@ -758,6 +825,7 @@ function renderSingle(site, data, container) {
     drawWorldMap('ch-map', countryR, site.color);
     wireSearch('pg-search', 'tbl-pages');
     ['tbl-pages','tbl-countries','tbl-sources'].forEach(wireSort);
+    attachCardTips();
 }
 
 function renderCompare(s1, d1, s2, d2, container) {
@@ -799,6 +867,7 @@ function renderCompare(s1, d1, s2, d2, container) {
     drawCompareBar('ch-cmp', s1, k1, s2, k2);
     drawTrend('ch-tr1', tr1, s1.color, s1.name);
     drawTrend('ch-tr2', tr2, s2.color, s2.name);
+    attachCardTips();
 }
 
 function cmpKpiCol(s, k) {
@@ -938,7 +1007,7 @@ function deltaBadge(cur, prev, goodWhenUp = true) {
 
 function kpi(iconName, label, val, deltaHtml, sparkSeries, color, sub) {
     return `<div class="kpi" style="--c:${color}">
-        <div class="kpi-top"><div class="kpi-icon">${ic(iconName)}</div>${deltaHtml || ''}</div>
+        <div class="kpi-top"><div class="kpi-icon">${ic(iconName)}</div><div class="kpi-tr">${infoFor(iconName)}${deltaHtml || ''}</div></div>
         <div class="kpi-val">${val}</div>
         <div class="kpi-label">${label}</div>
         ${sparkSeries ? sparkline(sparkSeries, color) : (sub ? `<div class="kpi-sub">${sub}</div>` : '')}
