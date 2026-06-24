@@ -11,6 +11,7 @@ const ALLOWED_PROPERTIES = new Set([
   '539481048', // mediax.academy
   '514290667', // mindlogicx.com / mindlogicx.com.my
   '514443920', // themediax.ai
+  '536126221', // mindlogicx.com.my (MLX Asia)
 ]);
 
 // Standard report whitelist
