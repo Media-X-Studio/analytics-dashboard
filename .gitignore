@@ -1,0 +1,19 @@
+# Secrets — NEVER commit the service-account key or any credentials
+service-account*.json
+google-service-account*.json
+*credentials*.json
+*.pem
+*.key
+.env
+.env.*
+
+# Backups created during edits
+public/index.html.backup-*
+*.bak
+
+# Deps / build / OS
+node_modules/
+.vercel/
+.DS_Store
+Thumbs.db
+npm-debug.log*
