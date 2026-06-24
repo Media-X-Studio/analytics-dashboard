@@ -366,6 +366,10 @@
         .ov-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
         .ov-stats div { display: flex; flex-direction: column; font-size: 10.5px; color: var(--text-muted); gap: 2px; }
         .ov-stats span { font-size: 15px; font-weight: 700; color: var(--text); }
+        .ov-card-err { opacity: .85; }
+        .ov-err { margin-top: 6px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+        .ov-err span { color: var(--o); }
+        .ov-err-sub { font-size: 11px; color: var(--text-dim); font-weight: 400; margin-top: 4px; word-break: break-word; }
         @media (max-width: 1024px) { .ov-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 900px) { .live-heat { grid-template-columns: 1fr; } }
         @media (max-width: 680px) { .ov-grid { grid-template-columns: 1fr; } }
@@ -467,7 +471,7 @@ const SITES = [
     { name: 'Mediax Academy',       domain: 'mediax.academy',       pid: '539481048', color: '#f59e0b' },
     { name: 'Mindlogicx',           domain: 'mindlogicx.com',       pid: '514290667', color: '#f43f5e' },
     { name: 'The Mediax',           domain: 'themediax.ai',         pid: '514443920', color: '#a855f7' },
-    { name: 'Mindlogicx MY',        domain: 'mindlogicx.com.my',    pid: '514290667', color: '#0ea5e9' },
+    { name: 'Mindlogicx MY',        domain: 'mindlogicx.com.my',    pid: '536126221', color: '#0ea5e9' },
 ];
 
 const CHANNEL_COLORS = ['#6366f1','#06d6a0','#f59e0b','#f43f5e','#a855f7','#0ea5e9','#10b981','#ec4899'];
@@ -939,17 +943,27 @@ function startRealtime(site){
 }
 
 async function fetchOverviewLite(site){
-    const dr = [dateRange()];
-    const [overview, prevOverview, trend] = await Promise.all([
-        report(site.pid, { dateRanges: dr, metrics: OV_METRICS }),
-        report(site.pid, { dateRanges: [prevRange()], metrics: OV_METRICS }),
-        report(site.pid, { dateRanges: dr, dimensions: [{ name: 'date' }], metrics: [{ name: 'totalUsers' }], orderBys: [{ dimension: { dimensionName: 'date' } }] }),
-    ]);
-    return { site, overview, prevOverview, trend };
+    try {
+        const dr = [dateRange()];
+        const [overview, prevOverview, trend] = await Promise.all([
+            report(site.pid, { dateRanges: dr, metrics: OV_METRICS }),
+            report(site.pid, { dateRanges: [prevRange()], metrics: OV_METRICS }),
+            report(site.pid, { dateRanges: dr, dimensions: [{ name: 'date' }], metrics: [{ name: 'totalUsers' }], orderBys: [{ dimension: { dimensionName: 'date' } }] }),
+        ]);
+        return { site, overview, prevOverview, trend };
+    } catch (e) {
+        return { site, error: e.message };
+    }
 }
 
 function renderOverview(all, container){
     const cards = all.map(d => {
+        if (d.error) {
+            return `<div class="ov-card ov-card-err" onclick="drillTo(${SITES.indexOf(d.site)})" style="--c:${d.site.color}">
+                <div class="ov-head"><span class="dot" style="background:${d.site.color};color:${d.site.color}"></span><div><div class="ov-name">${d.site.name}</div><div class="domain-tag">${d.site.domain}</div></div></div>
+                <div class="ov-err"><span>⚠ Data unavailable</span><div class="ov-err-sub">${esc(d.error)}</div></div>
+            </div>`;
+        }
         const k = kpis(d);
         const spark = rows(d.trend).map(r => +r.vals[0]);
         const idx = SITES.indexOf(d.site);
