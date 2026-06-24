@@ -16,7 +16,7 @@ const ALLOWED_PROPERTIES = new Set([
 // Standard report whitelist
 const ALLOWED_DIMENSIONS = new Set([
   'date', 'pagePath', 'sessionDefaultChannelGroup', 'country', 'sessionSource',
-  'deviceCategory', 'browser', 'operatingSystem', 'dayOfWeek', 'hour',
+  'deviceCategory', 'browser', 'operatingSystem', 'dayOfWeek', 'hour', 'hostName',
 ]);
 const ALLOWED_METRICS = new Set([
   'totalUsers', 'newUsers', 'sessions', 'bounceRate', 'averageSessionDuration', 'screenPageViews', 'engagementRate',
